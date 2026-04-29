@@ -1,0 +1,2246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>可转债套利监控编辑器</title>
+<style>
+/* ========== 全局重置与主题变量 ========== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-card: #1c2128;
+  --border: #30363d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent-blue: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-red: #f85149;
+  --accent-orange: #d29922;
+  --accent-yellow: #e3b341;
+  --accent-green-bg: rgba(63, 185, 80, 0.15);
+  --accent-red-bg: rgba(248, 81, 73, 0.15);
+  --accent-yellow-bg: rgba(227, 179, 65, 0.15);
+  --accent-orange-bg: rgba(210, 153, 34, 0.15);
+  --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --radius: 6px;
+  --sidebar-width: 240px;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  line-height: 1.5;
+}
+
+/* ========== 整体布局 ========== */
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ========== 左侧边栏 ========== */
+.sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+.sidebar-header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent-blue);
+}
+
+.sidebar-header .subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.sidebar-nav {
+  padding: 8px;
+  flex: 1;
+}
+
+.nav-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 2px;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.nav-item.active { background: var(--bg-tertiary); color: var(--accent-blue); }
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ========== 配置抽屉（侧边弹出） ========== */
+.config-drawer-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+.config-drawer-overlay.open { display: block; }
+
+.config-drawer {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-width);
+  width: 400px;
+  height: 100%;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  z-index: 101;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  padding: 20px;
+}
+.config-drawer-overlay.open .config-drawer { transform: translateX(0); }
+
+.config-drawer h2 {
+  font-size: 16px;
+  margin-bottom: 16px;
+  color: var(--accent-blue);
+}
+
+.config-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.config-section:last-child { border-bottom: none; }
+
+.config-section h3 {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ========== 右侧主区域 ========== */
+.main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ========== 预警横幅 ========== */
+.alert-banner {
+  display: none;
+  padding: 10px 20px;
+  background: var(--accent-red);
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  text-align: center;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.alert-banner.visible { display: block; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+/* ========== 顶部状态栏 ========== */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  min-height: 44px;
+}
+
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bond-selector {
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.top-bar-center {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  transition: background 0.3s;
+}
+.status-indicator.warning { background: var(--accent-orange); }
+.status-indicator.alert { background: var(--accent-red); animation: blink 0.8s infinite; }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.status-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ========== 内容滚动区 ========== */
+.content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* ========== 面板通用样式 ========== */
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-header h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.panel-header .toggle-icon {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.panel.collapsed .panel-body { display: none; }
+.panel.collapsed .toggle-icon { transform: rotate(-90deg); }
+
+.panel-body {
+  padding: 16px;
+}
+
+/* ========== 输入区 ========== */
+.input-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.input-group label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.input-group input, .input-group select {
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: var(--font-mono);
+  width: 140px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input-group input:focus {
+  border-color: var(--accent-blue);
+}
+
+.btn {
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: var(--font-sans);
+}
+
+.btn-primary {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+.btn-primary:hover { opacity: 0.9; }
+
+.btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.btn-secondary:hover { background: var(--border); }
+
+.btn-danger {
+  background: transparent;
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+.btn-danger:hover { background: var(--accent-red-bg); }
+
+/* ========== 指标卡片网格 ========== */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.metric-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.metric-value {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* A股惯例：红涨绿跌。.positive=盈利（红），.negative=亏损（绿） */
+.metric-value.positive { color: var(--accent-red); font-weight: 800; }
+.metric-value.negative { color: var(--accent-green); }
+.metric-value.highlight { background: var(--accent-red-bg); padding: 2px 6px; border-radius: 4px; }
+.metric-value.warning { color: var(--accent-orange); }
+.metric-value.danger { color: var(--accent-red); font-weight: 700; }   /* 风险警示（强赎/回售触发），与 P&L 颜色独立 */
+
+.metric-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ========== 表格通用 ========== */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th, .data-table td {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.data-table th {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.data-table td {
+  font-family: var(--font-mono);
+}
+
+/* A股惯例：cell-gain=盈利/达成（红），cell-loss=亏损（绿） */
+.data-table td.cell-gain { background: var(--accent-red-bg); color: var(--accent-red); }
+.data-table td.cell-loss { background: var(--accent-green-bg); color: var(--accent-green); }
+.data-table td.cell-yellow { background: var(--accent-yellow-bg); color: var(--accent-yellow); }
+.data-table td.cell-gray { background: rgba(110, 118, 129, 0.1); color: var(--text-muted); }
+
+/* ========== 下修面板分区 ========== */
+.revision-section {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.revision-section:last-child { border-bottom: none; }
+
+.revision-section h3 {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.status-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.status-tag.green { background: var(--accent-green-bg); color: var(--accent-green); }
+.status-tag.yellow { background: var(--accent-yellow-bg); color: var(--accent-yellow); }
+.status-tag.red { background: var(--accent-red-bg); color: var(--accent-red); }
+
+.disclaimer {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  line-height: 1.6;
+}
+
+/* ========== 历史记录面板 ========== */
+.history-table-wrapper {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* ========== 弹窗/模态框 ========== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  width: 420px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal h2 {
+  font-size: 16px;
+  margin-bottom: 16px;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.form-group input:focus, .form-group textarea:focus {
+  border-color: var(--accent-blue);
+}
+
+.form-group .hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.form-group .toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 2px;
+  top: 2px;
+  background: var(--text-secondary);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(16px);
+  background: #fff;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+/* ========== 滚动条 ========== */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- ====== 预警横幅 ====== -->
+<div class="alert-banner" id="alertBanner">
+  ⚠️ 套利机会：单张净收益 <span id="alertProfit">0.00</span> 元，收益率 <span id="alertRate">0.00</span>%
+</div>
+
+<div class="app-layout">
+  <!-- ====== 左侧边栏 ====== -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>可转债套利监控</h1>
+      <div class="subtitle">Convertible Bond Arbitrage</div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-panel="monitor">📊 主监控面板</button>
+      <button class="nav-item" data-panel="breakeven">📈 盈亏平衡分析</button>
+      <button class="nav-item" data-panel="sensitivity">🔢 敏感性矩阵</button>
+      <button class="nav-item" data-panel="revision">🔧 下修条件监控</button>
+      <button class="nav-item" data-panel="history">📋 历史记录</button>
+      <hr style="border-color: var(--border); margin: 8px 0;">
+      <button class="nav-item" id="btnBondConfig">⚙️ 转债配置</button>
+      <button class="nav-item" id="btnCostConfig">💰 成本配置</button>
+      <button class="nav-item" id="btnAlertConfig">🔔 预警配置</button>
+    </nav>
+    <div class="sidebar-footer">
+      v3.0 · 纯前端 · 数据本地存储
+    </div>
+  </aside>
+
+  <!-- ====== 右侧主区域 ====== -->
+  <div class="main-area">
+    <!-- 顶部状态栏 -->
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <select class="bond-selector" id="bondSelector">
+          <option value="118034">航宏转债 (118034)</option>
+        </select>
+      </div>
+      <div class="top-bar-center" id="currentTime">--:--:--</div>
+      <div class="top-bar-right">
+        <div class="status-indicator" id="statusIndicator"></div>
+        <span class="status-label" id="statusLabel">待输入</span>
+      </div>
+    </div>
+
+    <!-- 内容滚动区 -->
+    <div class="content-scroll">
+
+      <!-- ====== 主监控面板 ====== -->
+      <div class="panel" id="panelMonitor">
+        <div class="panel-header">
+          <h2>主监控面板</h2>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+          <div class="input-row">
+            <div class="input-group">
+              <label>转债价格（元）</label>
+              <input type="number" id="inputBondPrice" step="0.01" placeholder="如 120.00">
+            </div>
+            <div class="input-group">
+              <label>正股价格（元）</label>
+              <input type="number" id="inputStockPrice" step="0.01" placeholder="如 25.00">
+            </div>
+            <button class="btn btn-primary" id="btnUpdate">更新计算</button>
+          </div>
+          <div class="metrics-grid" id="metricsGrid">
+            <div class="metric-card">
+              <div class="metric-label">转股价值</div>
+              <div class="metric-value" id="metricConvValue">--</div>
+              <div class="metric-sub">每张转债换股后价值</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">转股溢价率</div>
+              <div class="metric-value" id="metricPremiumRate">--</div>
+              <div class="metric-sub">负数=折价（套利空间）</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">单张毛收益</div>
+              <div class="metric-value" id="metricGrossProfit">--</div>
+              <div class="metric-sub">转股价值 - 转债价格</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">单张净收益</div>
+              <div class="metric-value" id="metricNetProfit">--</div>
+              <div class="metric-sub">扣除全部交易成本</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">净收益率</div>
+              <div class="metric-value" id="metricNetProfitRate">--</div>
+              <div class="metric-sub">净收益 / 转债价格</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">距离强赎</div>
+              <div class="metric-value" id="metricCallDist">--</div>
+              <div class="metric-sub">正股价距强赎触发价</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">距离回售</div>
+              <div class="metric-value" id="metricPutDist">--</div>
+              <div class="metric-sub">正股价距回售触发价</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 盈亏平衡分析面板 ====== -->
+      <div class="panel" id="panelBreakeven">
+        <div class="panel-header">
+          <h2>盈亏平衡分析</h2>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+          <h3 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">价格阈值表</h3>
+          <div id="breakevenTable">
+            <p style="color: var(--text-muted);">请先输入价格数据</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 敏感性矩阵面板 ====== -->
+      <div class="panel" id="panelSensitivity">
+        <div class="panel-header">
+          <h2>双向敏感性矩阵（5×5）</h2>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+          <div id="sensitivityMatrix">
+            <p style="color: var(--text-muted);">请先输入价格数据</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 下修条件监控面板 ====== -->
+      <div class="panel" id="panelRevision">
+        <div class="panel-header">
+          <h2>下修条件监控</h2>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+          <!-- 第一区：当前下修触发判断 -->
+          <div class="revision-section">
+            <h3>当前下修触发判断</h3>
+            <div id="revisionTrigger">
+              <p style="color: var(--text-muted);">请先输入正股价格</p>
+            </div>
+          </div>
+          <!-- 第二区：理论下修底参考 -->
+          <div class="revision-section">
+            <h3>理论下修底参考</h3>
+            <div id="revisionFloor">
+              <p style="color: var(--text-muted);">加载中...</p>
+            </div>
+          </div>
+          <!-- 第三区：下修历史 -->
+          <div class="revision-section">
+            <h3>下修历史</h3>
+            <div id="revisionHistory">
+              <p style="color: var(--text-muted);">暂无下修记录</p>
+            </div>
+            <button class="btn btn-secondary" id="btnAddRevision" style="margin-top: 12px;">+ 记录新下修</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 历史记录面板 ====== -->
+      <div class="panel" id="panelHistory">
+        <div class="panel-header">
+          <h2>历史记录</h2>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-body">
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+            <button class="btn btn-secondary" id="btnExportCSV">导出 CSV</button>
+          </div>
+          <div class="history-table-wrapper" id="historyTableWrapper">
+            <p style="color: var(--text-muted);">暂无历史记录</p>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content-scroll -->
+  </div><!-- /main-area -->
+</div><!-- /app-layout -->
+
+<!-- ====== 配置抽屉 ====== -->
+<div class="config-drawer-overlay" id="configDrawerOverlay">
+  <div class="config-drawer" id="configDrawer">
+    <!-- 动态填充 -->
+  </div>
+</div>
+
+<!-- ====== 下修记录模态框 ====== -->
+<div class="modal-overlay" id="revisionModal">
+  <div class="modal">
+    <h2>记录新下修</h2>
+    <div class="form-group">
+      <label>生效日期</label>
+      <input type="date" id="revisionDate">
+    </div>
+    <div class="form-group">
+      <label>新转股价（元）</label>
+      <input type="number" id="revisionNewPrice" step="0.01" placeholder="下修后的转股价">
+    </div>
+    <div class="form-group">
+      <label>备注（可选）</label>
+      <input type="text" id="revisionNote" placeholder="如：首次下修">
+    </div>
+    <div class="form-group hint" id="revisionOldPriceHint"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btnCancelRevision">取消</button>
+      <button class="btn btn-primary" id="btnConfirmRevision">确认记录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 新增转债模态框 ====== -->
+<div class="modal-overlay" id="addBondModal">
+  <div class="modal">
+    <h2>新增可转债</h2>
+    <div class="form-group">
+      <label>转债代码</label>
+      <input type="text" id="newBondCode" placeholder="如 118034">
+    </div>
+    <div class="form-group">
+      <label>转债名称</label>
+      <input type="text" id="newBondName" placeholder="如 航宏转债">
+    </div>
+    <div class="form-group">
+      <label>正股代码</label>
+      <input type="text" id="newStockCode" placeholder="如 688066">
+    </div>
+    <div class="form-group">
+      <label>正股名称</label>
+      <input type="text" id="newStockName" placeholder="如 航天宏图">
+    </div>
+    <div class="form-group">
+      <label>当前转股价（元）</label>
+      <input type="number" id="newConvPrice" step="0.01" placeholder="如 20.00">
+    </div>
+    <div class="form-group">
+      <label>每股净资产（元）</label>
+      <input type="number" id="newNetAsset" step="0.01" placeholder="如 5.20">
+    </div>
+    <div class="form-group">
+      <label>
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="newHasFloor" checked>
+            <span class="toggle-slider"></span>
+          </label>
+          <span>下修不低于每股净资产</span>
+        </div>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btnCancelAddBond">取消</button>
+      <button class="btn btn-primary" id="btnConfirmAddBond">确认新增</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   可转债套利监控编辑器 v3.0
+   模块结构：App.Storage / App.Config / App.Calculator / App.Alert / App.History / App.UI
+   ========================================================================== */
+
+const App = {
+  Storage: {},
+  Config: {},
+  Calculator: {},
+  Alert: {},
+  History: {},
+  UI: {}
+};
+
+// ==================== Storage 模块 ====================
+// localStorage 封装 — 统一前缀，JSON 序列化
+App.Storage.PREFIX = 'cb_arb_v3_';
+
+App.Storage.get = function(key, defaultValue) {
+  try {
+    const raw = localStorage.getItem(App.Storage.PREFIX + key);
+    if (raw === null) return defaultValue;
+    return JSON.parse(raw);
+  } catch (e) {
+    console.warn('Storage.get 失败：', key, e);
+    return defaultValue;
+  }
+};
+
+App.Storage.set = function(key, value) {
+  try {
+    localStorage.setItem(App.Storage.PREFIX + key, JSON.stringify(value));
+  } catch (e) {
+    console.error('Storage.set 失败：', key, e);
+  }
+};
+
+App.Storage.remove = function(key) {
+  localStorage.removeItem(App.Storage.PREFIX + key);
+};
+
+App.Storage.clear = function() {
+  Object.keys(localStorage)
+    .filter(k => k.startsWith(App.Storage.PREFIX))
+    .forEach(k => localStorage.removeItem(k));
+};
+
+// ==================== Config 模块 ====================
+// 默认配置（首次加载或重置时使用）
+App.Config.DEFAULT_BONDS = [
+  {
+    bondCode: "118034",
+    bondName: "航宏转债",
+    stockCode: "688066",
+    stockName: "航天宏图",
+    conversionPrice: 20.00,
+    parValue: 100,
+    callTriggerRatio: 1.30,
+    putTriggerRatio: 0.70,
+    revisionTriggerRatio: 0.80,
+    revisionWindowDays: 30,
+    revisionRequiredDays: 15,
+    netAssetPerShare: 5.20,
+    hasNetAssetFloor: true,
+    stockFaceValue: 1.00,
+    revisionHistory: [],
+    notes: "示例配置，实际参数请以最新公告为准"
+  }
+];
+
+App.Config.DEFAULT_COST = {
+  bondCommissionRate: 0.0001,
+  stockCommissionRate: 0.00025,
+  stockMinCommission: 5,
+  stampDutyRate: 0.0005,
+  slippageBuffer: 0.002
+};
+
+App.Config.DEFAULT_ALERT = {
+  netProfitRateThreshold: 0.01,
+  netProfitPerBondThreshold: 1,
+  enableSound: true,
+  enableBrowserNotification: true,
+  alertCooldownSeconds: 30
+};
+
+// 当前选中的转债代码
+App.Config.currentBondCode = null;
+
+// 加载所有配置（首次写入默认值）
+App.Config.load = function() {
+  let bonds = App.Storage.get('bonds', null);
+  if (!bonds || !Array.isArray(bonds) || bonds.length === 0) {
+    bonds = App.Config.DEFAULT_BONDS;
+    App.Storage.set('bonds', bonds);
+  }
+  let cost = App.Storage.get('cost', null);
+  if (!cost) {
+    cost = App.Config.DEFAULT_COST;
+    App.Storage.set('cost', cost);
+  } else {
+    // 兼容性：补齐缺失字段
+    cost = Object.assign({}, App.Config.DEFAULT_COST, cost);
+  }
+  let alert = App.Storage.get('alert', null);
+  if (!alert) {
+    alert = App.Config.DEFAULT_ALERT;
+    App.Storage.set('alert', alert);
+  } else {
+    alert = Object.assign({}, App.Config.DEFAULT_ALERT, alert);
+  }
+
+  let currentCode = App.Storage.get('currentBondCode', null);
+  if (!currentCode || !bonds.some(b => b.bondCode === currentCode)) {
+    currentCode = bonds[0].bondCode;
+    App.Storage.set('currentBondCode', currentCode);
+  }
+
+  App.Config._bonds = bonds;
+  App.Config._cost = cost;
+  App.Config._alert = alert;
+  App.Config.currentBondCode = currentCode;
+};
+
+App.Config.getBonds = function() { return App.Config._bonds; };
+App.Config.getCost = function() { return App.Config._cost; };
+App.Config.getAlert = function() { return App.Config._alert; };
+
+App.Config.getCurrentBond = function() {
+  return App.Config._bonds.find(b => b.bondCode === App.Config.currentBondCode) || App.Config._bonds[0];
+};
+
+App.Config.setCurrentBond = function(bondCode) {
+  if (App.Config._bonds.some(b => b.bondCode === bondCode)) {
+    App.Config.currentBondCode = bondCode;
+    App.Storage.set('currentBondCode', bondCode);
+  }
+};
+
+App.Config.updateBond = function(bondCode, patch) {
+  const idx = App.Config._bonds.findIndex(b => b.bondCode === bondCode);
+  if (idx >= 0) {
+    App.Config._bonds[idx] = Object.assign({}, App.Config._bonds[idx], patch);
+    App.Storage.set('bonds', App.Config._bonds);
+  }
+};
+
+App.Config.addBond = function(newBond) {
+  // 兜底默认值
+  const bond = Object.assign({
+    parValue: 100,
+    callTriggerRatio: 1.30,
+    putTriggerRatio: 0.70,
+    revisionTriggerRatio: 0.80,
+    revisionWindowDays: 30,
+    revisionRequiredDays: 15,
+    stockFaceValue: 1.00,
+    hasNetAssetFloor: true,
+    revisionHistory: [],
+    notes: ""
+  }, newBond);
+  if (App.Config._bonds.some(b => b.bondCode === bond.bondCode)) {
+    throw new Error('该转债代码已存在：' + bond.bondCode);
+  }
+  App.Config._bonds.push(bond);
+  App.Storage.set('bonds', App.Config._bonds);
+};
+
+App.Config.removeBond = function(bondCode) {
+  if (App.Config._bonds.length <= 1) throw new Error('至少保留一只转债');
+  App.Config._bonds = App.Config._bonds.filter(b => b.bondCode !== bondCode);
+  App.Storage.set('bonds', App.Config._bonds);
+  if (App.Config.currentBondCode === bondCode) {
+    App.Config.setCurrentBond(App.Config._bonds[0].bondCode);
+  }
+};
+
+App.Config.updateCost = function(patch) {
+  App.Config._cost = Object.assign({}, App.Config._cost, patch);
+  App.Storage.set('cost', App.Config._cost);
+};
+
+App.Config.updateAlert = function(patch) {
+  App.Config._alert = Object.assign({}, App.Config._alert, patch);
+  App.Storage.set('alert', App.Config._alert);
+};
+
+App.Config.addRevisionRecord = function(bondCode, record) {
+  // record: { date, oldPrice, newPrice, note }
+  const bond = App.Config._bonds.find(b => b.bondCode === bondCode);
+  if (!bond) return;
+  bond.revisionHistory = bond.revisionHistory || [];
+  bond.revisionHistory.push(record);
+  bond.conversionPrice = record.newPrice; // 自动更新当前转股价
+  App.Storage.set('bonds', App.Config._bonds);
+};
+
+// 启动时加载配置
+App.Config.load();
+console.log('配置已加载：', App.Config._bonds.length, '只转债，当前选中：', App.Config.currentBondCode);
+
+// ==================== Calculator 模块 ====================
+/**
+ * 核心计算函数 — 不依赖任何具体可转债，纯函数
+ * @param {Object} bondConfig 可转债配置（见 3.1）
+ * @param {Object} prices { bondPrice, stockPrice }
+ * @param {Object} costConfig 成本配置（见 3.2）
+ * @returns {Object} 计算结果
+ */
+App.Calculator.calculateArbitrage = function(bondConfig, prices, costConfig) {
+  const { bondPrice, stockPrice } = prices;
+  const { conversionPrice, parValue, callTriggerRatio, putTriggerRatio } = bondConfig;
+
+  // 4.1 基础指标
+  const conversionShares = parValue / conversionPrice;       // 转股数量
+  const conversionValue = conversionShares * stockPrice;     // 转股价值
+  const premiumRate = conversionValue > 0
+    ? (bondPrice - conversionValue) / conversionValue
+    : 0;                                                     // 转股溢价率
+
+  // 4.2 套利净收益
+  const grossProfit = conversionValue - bondPrice;           // 毛收益（每张）
+
+  const bondCommission = bondPrice * costConfig.bondCommissionRate;
+  // 股票卖出佣金：max(转股价值 × 佣金率, 最低佣金 / 转股数量)
+  const stockCommissionRaw = conversionValue * costConfig.stockCommissionRate;
+  const stockMinPerBond = costConfig.stockMinCommission / conversionShares;
+  const stockCommission = Math.max(stockCommissionRaw, stockMinPerBond);
+  const stampDuty = conversionValue * costConfig.stampDutyRate;
+  const slippage = conversionValue * costConfig.slippageBuffer;
+  const totalCost = bondCommission + stockCommission + stampDuty + slippage;
+
+  const netProfitPerBond = grossProfit - totalCost;
+  const netProfitRate = bondPrice > 0 ? netProfitPerBond / bondPrice : 0;
+
+  // 4.3 距离强赎/回售（百分比，正值=未触发，负值=已触发）
+  const callTriggerPrice = conversionPrice * callTriggerRatio;
+  const putTriggerPrice = conversionPrice * putTriggerRatio;
+  const callDistanceRate = (callTriggerPrice - stockPrice) / stockPrice; // 还需上涨多少
+  const putDistanceRate = (stockPrice - putTriggerPrice) / stockPrice;   // 还能下跌多少
+
+  return {
+    bondCode: bondConfig.bondCode,
+    bondPrice,
+    stockPrice,
+    conversionShares,
+    conversionValue,
+    premiumRate,
+    grossProfit,
+    bondCommission,
+    stockCommission,
+    stampDuty,
+    slippage,
+    totalCost,
+    netProfitPerBond,
+    netProfitRate,
+    callTriggerPrice,
+    putTriggerPrice,
+    callDistanceRate,
+    putDistanceRate
+  };
+};
+
+/**
+ * 4.4 理论下修底
+ * @param {Object} bondConfig 需 hasNetAssetFloor / netAssetPerShare / stockFaceValue / conversionPrice
+ * @returns {Object} { theoreticalFloor, spaceFromCurrent, spacePercent }
+ */
+App.Calculator.calculateRevisionFloor = function(bondConfig) {
+  const { hasNetAssetFloor, netAssetPerShare, stockFaceValue, conversionPrice } = bondConfig;
+  const theoreticalFloor = hasNetAssetFloor
+    ? Math.max(netAssetPerShare || 0, stockFaceValue || 1)
+    : (stockFaceValue || 1);
+
+  const spaceFromCurrent = conversionPrice - theoreticalFloor;
+  const spacePercent = conversionPrice > 0 ? spaceFromCurrent / conversionPrice : 0;
+
+  return { theoreticalFloor, spaceFromCurrent, spacePercent };
+};
+
+/**
+ * 4.5 预警判断 — 两个条件都必须满足
+ * @returns {Boolean}
+ */
+App.Calculator.shouldTriggerAlert = function(calcResult, alertConfig) {
+  return calcResult.netProfitRate >= alertConfig.netProfitRateThreshold
+      && calcResult.netProfitPerBond >= alertConfig.netProfitPerBondThreshold;
+};
+
+/**
+ * 4.6 反推：当前转债价下，正股价需达到多少才能达到目标净收益率
+ * 用二分搜索（因为最低佣金条款使公式分段，无法解析求解）
+ */
+App.Calculator.findStockPriceThreshold = function(bondConfig, bondPrice, targetRate, costConfig) {
+  let lo = 0.01, hi = 1000;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    const r = App.Calculator.calculateArbitrage(bondConfig, { bondPrice, stockPrice: mid }, costConfig);
+    if (r.netProfitRate < targetRate) lo = mid;
+    else hi = mid;
+    if (hi - lo < 0.001) break;
+  }
+  return (lo + hi) / 2;
+};
+
+/**
+ * 4.6 反推：当前正股价下，转债价需跌至多少才能达到目标净收益率
+ */
+App.Calculator.findBondPriceThreshold = function(bondConfig, stockPrice, targetRate, costConfig) {
+  let lo = 50, hi = 200;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    const r = App.Calculator.calculateArbitrage(bondConfig, { bondPrice: mid, stockPrice }, costConfig);
+    // 转债价越低 → 净收益率越高，所以要找最高的能满足 target 的转债价
+    if (r.netProfitRate >= targetRate) lo = mid;
+    else hi = mid;
+    if (hi - lo < 0.001) break;
+  }
+  return (lo + hi) / 2;
+};
+
+// ==================== 自测函数 ====================
+App.Calculator.selfTest = function() {
+  const bondConfig = {
+    bondCode: "118034",
+    bondName: "航宏转债",
+    conversionPrice: 20.00,
+    parValue: 100,
+    callTriggerRatio: 1.30,
+    putTriggerRatio: 0.70,
+    revisionTriggerRatio: 0.80,
+    netAssetPerShare: 5.20,
+    hasNetAssetFloor: true,
+    stockFaceValue: 1.00
+  };
+  const costConfig = {
+    bondCommissionRate: 0.0001,
+    stockCommissionRate: 0.00025,
+    stockMinCommission: 5,
+    stampDutyRate: 0.0005,
+    slippageBuffer: 0.002
+  };
+  const alertConfig = { netProfitRateThreshold: 0.01, netProfitPerBondThreshold: 1 };
+
+  const r = App.Calculator.calculateArbitrage(bondConfig, { bondPrice: 120, stockPrice: 25 }, costConfig);
+  console.group('🧪 Calculator 自测');
+  console.log('输入：转股价 20，转债 120，正股 25');
+  console.log('转股数量：', r.conversionShares.toFixed(4), '（应为 5.0000）');
+  console.log('转股价值：', r.conversionValue.toFixed(2), '（应为 125.00）');
+  console.log('溢价率：', (r.premiumRate * 100).toFixed(2) + '%', '（应约 -4%）');
+  console.log('毛收益：', r.grossProfit.toFixed(4), '（应为 5.00）');
+  console.log('总成本：', r.totalCost.toFixed(4));
+  console.log('净收益：', r.netProfitPerBond.toFixed(4));
+  console.log('净收益率：', (r.netProfitRate * 100).toFixed(2) + '%', '（应约 4%）');
+  console.log('应触发预警：', App.Calculator.shouldTriggerAlert(r, alertConfig), '（应为 true）');
+
+  const floor = App.Calculator.calculateRevisionFloor(bondConfig);
+  console.log('理论下修底：', floor.theoreticalFloor, '（应为 5.20）');
+  console.log('距下修底空间：', (floor.spacePercent * 100).toFixed(2) + '%', '（应为 74%）');
+
+  // 反推测试
+  const stockThreshold = App.Calculator.findStockPriceThreshold(bondConfig, 120, 0.01, costConfig);
+  console.log('转债 120，目标 1% 净收益所需正股价：', stockThreshold.toFixed(3));
+  const bondThreshold = App.Calculator.findBondPriceThreshold(bondConfig, 25, 0.01, costConfig);
+  console.log('正股 25，目标 1% 净收益所需转债价：', bondThreshold.toFixed(3));
+  console.groupEnd();
+
+  return r;
+};
+
+// 页面加载后自动跑自测
+App.Calculator.selfTest();
+
+// ==================== Alert 预警模块 ====================
+App.Alert._lastAlertTime = 0;
+App.Alert._audioCtx = null;
+
+// 用 Web Audio API 合成短促铃声（不依赖外部资源）
+App.Alert.playSound = function() {
+  try {
+    if (!App.Alert._audioCtx) {
+      App.Alert._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const ctx = App.Alert._audioCtx;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    // 两声短促 "叮" — 频率 880Hz 与 1320Hz
+    [{f: 880, t: 0}, {f: 1320, t: 0.15}].forEach(({f, t}) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const start = ctx.currentTime + t;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.3, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.12);
+      osc.start(start);
+      osc.stop(start + 0.13);
+    });
+  } catch (e) {
+    console.warn('提示音播放失败：', e);
+  }
+};
+
+// 浏览器通知（首次需要授权）
+App.Alert.requestNotificationPermission = function() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+};
+
+App.Alert.showBrowserNotification = function(title, body) {
+  try {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    const n = new Notification(title, {
+      body,
+      tag: 'cb-arbitrage-alert',
+      requireInteraction: false
+    });
+    setTimeout(() => n.close(), 8000);
+  } catch (e) {
+    console.warn('浏览器通知失败：', e);
+  }
+};
+
+// 横幅显示/隐藏
+App.Alert.showBanner = function(profit, rate) {
+  const banner = document.getElementById('alertBanner');
+  document.getElementById('alertProfit').textContent = profit.toFixed(2);
+  document.getElementById('alertRate').textContent = (rate * 100).toFixed(2);
+  banner.classList.add('visible');
+};
+
+App.Alert.hideBanner = function() {
+  document.getElementById('alertBanner').classList.remove('visible');
+};
+
+/**
+ * 由 renderMonitor 每次计算后调用
+ * @param {Object} calcResult
+ * @param {Boolean} triggered 当前是否满足触发条件
+ */
+App.Alert.handle = function(calcResult, triggered) {
+  if (!triggered) {
+    App.Alert.hideBanner();
+    return;
+  }
+
+  // 横幅始终保持显示（满足条件期间）
+  App.Alert.showBanner(calcResult.netProfitPerBond, calcResult.netProfitRate);
+
+  // 冷却期内不重复触发声音/通知
+  const now = Date.now();
+  const cfg = App.Config.getAlert();
+  const cooldownMs = (cfg.alertCooldownSeconds || 30) * 1000;
+  if (now - App.Alert._lastAlertTime < cooldownMs) return;
+  App.Alert._lastAlertTime = now;
+
+  if (cfg.enableSound) App.Alert.playSound();
+  if (cfg.enableBrowserNotification) {
+    App.Alert.showBrowserNotification(
+      '套利机会触发',
+      `单张净收益 ${calcResult.netProfitPerBond.toFixed(2)} 元，收益率 ${(calcResult.netProfitRate * 100).toFixed(2)}%`
+    );
+  }
+};
+
+// 页面首次交互时尝试解锁音频上下文（多数浏览器要求）
+document.addEventListener('click', function unlockAudio() {
+  try {
+    if (!App.Alert._audioCtx) {
+      App.Alert._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (App.Alert._audioCtx.state === 'suspended') App.Alert._audioCtx.resume();
+  } catch (e) {}
+  document.removeEventListener('click', unlockAudio);
+}, { once: true });
+
+// 启动时请求通知权限
+App.Alert.requestNotificationPermission();
+
+// ==================== History 历史记录模块 ====================
+App.History.MAX_RECORDS = 50;
+App.History._lastRecord = null; // 防止连续相同输入重复记录
+
+App.History.load = function() {
+  return App.Storage.get('history', []);
+};
+
+App.History.save = function(records) {
+  App.Storage.set('history', records);
+};
+
+App.History.record = function(calcResult, triggered) {
+  if (!calcResult) return;
+  // 防抖：相同 bondCode + bondPrice + stockPrice 在 2 秒内不重复记录
+  const key = calcResult.bondCode + '_' + calcResult.bondPrice + '_' + calcResult.stockPrice;
+  const now = Date.now();
+  if (App.History._lastRecord
+      && App.History._lastRecord.key === key
+      && now - App.History._lastRecord.time < 2000) {
+    return;
+  }
+  App.History._lastRecord = { key, time: now };
+
+  const records = App.History.load();
+  records.unshift({
+    timestamp: now,
+    bondCode: calcResult.bondCode,
+    bondPrice: calcResult.bondPrice,
+    stockPrice: calcResult.stockPrice,
+    conversionValue: calcResult.conversionValue,
+    premiumRate: calcResult.premiumRate,
+    netProfitPerBond: calcResult.netProfitPerBond,
+    netProfitRate: calcResult.netProfitRate,
+    triggeredAlert: !!triggered
+  });
+  // 保留最新 N 条
+  if (records.length > App.History.MAX_RECORDS) {
+    records.length = App.History.MAX_RECORDS;
+  }
+  App.History.save(records);
+  App.UI.renderHistory();
+};
+
+App.History.clear = function() {
+  App.Storage.set('history', []);
+  App.UI.renderHistory();
+};
+
+App.History.exportCSV = function() {
+  const records = App.History.load();
+  if (records.length === 0) {
+    alert('暂无历史记录可导出');
+    return;
+  }
+  const bonds = App.Config.getBonds();
+  const bondNameMap = {};
+  bonds.forEach(b => bondNameMap[b.bondCode] = b.bondName);
+
+  const headers = ['时间','转债代码','转债名称','转债价格','正股价格','转股价值','溢价率(%)','单张净收益','净收益率(%)','是否触发预警'];
+  const rows = records.map(r => {
+    const dt = new Date(r.timestamp);
+    const ts = dt.getFullYear() + '-' +
+               String(dt.getMonth()+1).padStart(2,'0') + '-' +
+               String(dt.getDate()).padStart(2,'0') + ' ' +
+               String(dt.getHours()).padStart(2,'0') + ':' +
+               String(dt.getMinutes()).padStart(2,'0') + ':' +
+               String(dt.getSeconds()).padStart(2,'0');
+    return [
+      ts,
+      r.bondCode,
+      bondNameMap[r.bondCode] || '',
+      r.bondPrice.toFixed(2),
+      r.stockPrice.toFixed(2),
+      r.conversionValue.toFixed(2),
+      (r.premiumRate * 100).toFixed(2),
+      r.netProfitPerBond.toFixed(2),
+      (r.netProfitRate * 100).toFixed(2),
+      r.triggeredAlert ? '是' : '否'
+    ];
+  });
+
+  // CSV 转义：含逗号/引号/换行的字段加双引号包裹，内部双引号转义为两个双引号
+  const escape = (v) => {
+    const s = String(v);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  };
+  const csv = [headers, ...rows].map(row => row.map(escape).join(',')).join('\r\n');
+
+  // BOM 让 Excel 正确识别 UTF-8 中文
+  const BOM = '﻿';
+  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const fname = '套利历史_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.csv';
+  a.href = url;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+App.UI.renderHistory = function() {
+  const wrap = document.getElementById('historyTableWrapper');
+  const records = App.History.load();
+  if (records.length === 0) {
+    wrap.innerHTML = '<p style="color: var(--text-muted);">暂无历史记录</p>';
+    return;
+  }
+  const bonds = App.Config.getBonds();
+  const bondNameMap = {};
+  bonds.forEach(b => bondNameMap[b.bondCode] = b.bondName);
+
+  let html = `<table class="data-table">
+    <thead>
+      <tr>
+        <th>时间</th>
+        <th>转债</th>
+        <th>转债价</th>
+        <th>正股价</th>
+        <th>溢价率</th>
+        <th>净收益</th>
+        <th>净收益率</th>
+        <th>预警</th>
+      </tr>
+    </thead><tbody>`;
+  records.forEach(r => {
+    const dt = new Date(r.timestamp);
+    const ts = String(dt.getMonth()+1).padStart(2,'0') + '/' +
+               String(dt.getDate()).padStart(2,'0') + ' ' +
+               String(dt.getHours()).padStart(2,'0') + ':' +
+               String(dt.getMinutes()).padStart(2,'0') + ':' +
+               String(dt.getSeconds()).padStart(2,'0');
+    const premCls = r.premiumRate < 0 ? 'cell-gain' : '';
+    const netCls = r.netProfitPerBond > 0 ? 'cell-gain' : (r.netProfitPerBond < 0 ? 'cell-loss' : '');
+    const rateCls = r.netProfitRate > 0 ? 'cell-gain' : (r.netProfitRate < 0 ? 'cell-loss' : '');
+    html += `<tr>
+      <td>${ts}</td>
+      <td>${(bondNameMap[r.bondCode] || r.bondCode)}</td>
+      <td>${r.bondPrice.toFixed(2)}</td>
+      <td>${r.stockPrice.toFixed(2)}</td>
+      <td class="${premCls}">${(r.premiumRate * 100).toFixed(2)}%</td>
+      <td class="${netCls}">${r.netProfitPerBond.toFixed(2)}</td>
+      <td class="${rateCls}">${(r.netProfitRate * 100).toFixed(2)}%</td>
+      <td>${r.triggeredAlert ? '⚠️' : ''}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  html += `<p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">共 ${records.length} 条记录（最多保留 ${App.History.MAX_RECORDS} 条）</p>`;
+  wrap.innerHTML = html;
+};
+
+// 绑定导出按钮
+document.getElementById('btnExportCSV').addEventListener('click', App.History.exportCSV);
+
+// 在导出按钮旁加一个"清空历史"按钮
+(function addClearBtn() {
+  const exportBtn = document.getElementById('btnExportCSV');
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'btn btn-danger';
+  clearBtn.textContent = '清空历史';
+  clearBtn.style.marginRight = '8px';
+  clearBtn.addEventListener('click', () => {
+    if (confirm('确认清空所有历史记录？此操作不可恢复。')) {
+      App.History.clear();
+    }
+  });
+  exportBtn.parentNode.insertBefore(clearBtn, exportBtn);
+})();
+
+// ==================== UI 模块 ====================
+
+// 当前最新计算结果，供其他面板复用
+App.UI.lastCalc = null;
+App.UI.lastPrices = { bondPrice: null, stockPrice: null };
+
+// 数字格式化辅助
+App.UI.fmt = function(num, digits) {
+  digits = (digits === undefined) ? 2 : digits;
+  if (num === null || num === undefined || !isFinite(num)) return '--';
+  return Number(num).toFixed(digits);
+};
+App.UI.fmtPct = function(num, digits) {
+  digits = (digits === undefined) ? 2 : digits;
+  if (num === null || num === undefined || !isFinite(num)) return '--';
+  return (num * 100).toFixed(digits) + '%';
+};
+
+// 设置 P&L 颜色类（A股惯例：盈利红、亏损绿）
+// options.invertSign: true 表示 negative 才是好事（如折价率），negative 显示盈利红
+// options.markPositive: true 表示 positive 也要染色（盈利红）
+App.UI.setSignClass = function(el, value, options) {
+  options = options || {};
+  el.classList.remove('positive', 'negative', 'highlight', 'warning', 'danger');
+  if (value === null || value === undefined || !isFinite(value)) return;
+  if (options.highlightIfGE !== undefined && value >= options.highlightIfGE) {
+    el.classList.add('highlight');
+  }
+  const isGain = options.invertSign ? value < 0 : value > 0;
+  const isLoss = options.invertSign ? value > 0 : value < 0;
+  if (isGain) {
+    if (options.invertSign || options.markPositive) el.classList.add('positive'); // 盈利红
+  }
+  if (isLoss) el.classList.add('negative'); // 亏损绿
+};
+
+// 渲染顶部转债下拉列表
+App.UI.renderBondSelector = function() {
+  const sel = document.getElementById('bondSelector');
+  const bonds = App.Config.getBonds();
+  sel.innerHTML = '';
+  bonds.forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.bondCode;
+    opt.textContent = b.bondName + ' (' + b.bondCode + ')';
+    sel.appendChild(opt);
+  });
+  sel.value = App.Config.currentBondCode;
+};
+
+// 主监控面板渲染
+App.UI.renderMonitor = function() {
+  const bondPrice = parseFloat(document.getElementById('inputBondPrice').value);
+  const stockPrice = parseFloat(document.getElementById('inputStockPrice').value);
+
+  if (!isFinite(bondPrice) || !isFinite(stockPrice) || bondPrice <= 0 || stockPrice <= 0) {
+    App.UI.lastCalc = null;
+    App.UI.updateStatusIndicator('idle');
+    // 即使无价格输入，下修面板也要刷新（理论下修底/历史只依赖配置）
+    if (typeof App.UI.renderRevision === 'function') App.UI.renderRevision();
+    return null;
+  }
+
+  const bond = App.Config.getCurrentBond();
+  const cost = App.Config.getCost();
+  const alertCfg = App.Config.getAlert();
+  const r = App.Calculator.calculateArbitrage(bond, { bondPrice, stockPrice }, cost);
+  App.UI.lastCalc = r;
+  App.UI.lastPrices = { bondPrice, stockPrice };
+
+  // 卡片填充
+  document.getElementById('metricConvValue').textContent = App.UI.fmt(r.conversionValue);
+
+  const elPremium = document.getElementById('metricPremiumRate');
+  elPremium.textContent = App.UI.fmtPct(r.premiumRate);
+  // 溢价率：负数（折价）= 套利机会 = 盈利方向 → 红色加粗
+  App.UI.setSignClass(elPremium, r.premiumRate, { invertSign: true });
+
+  const elGross = document.getElementById('metricGrossProfit');
+  elGross.textContent = App.UI.fmt(r.grossProfit) + ' 元';
+  App.UI.setSignClass(elGross, r.grossProfit, { markPositive: true });
+
+  const elNet = document.getElementById('metricNetProfit');
+  elNet.textContent = App.UI.fmt(r.netProfitPerBond) + ' 元';
+  App.UI.setSignClass(elNet, r.netProfitPerBond, {
+    markPositive: true,
+    highlightIfGE: alertCfg.netProfitPerBondThreshold
+  });
+
+  const elNetRate = document.getElementById('metricNetProfitRate');
+  elNetRate.textContent = App.UI.fmtPct(r.netProfitRate);
+  App.UI.setSignClass(elNetRate, r.netProfitRate, {
+    markPositive: true,
+    highlightIfGE: alertCfg.netProfitRateThreshold
+  });
+
+  // 距离强赎/回售 — 风险信号：触发=红danger，接近=橙warning（与 P&L 颜色独立）
+  const elCall = document.getElementById('metricCallDist');
+  elCall.textContent = App.UI.fmtPct(r.callDistanceRate);
+  elCall.classList.remove('positive', 'negative', 'warning', 'highlight', 'danger');
+  if (r.callDistanceRate <= 0) elCall.classList.add('danger');
+  else if (r.callDistanceRate < 0.05) elCall.classList.add('warning');
+
+  const elPut = document.getElementById('metricPutDist');
+  elPut.textContent = App.UI.fmtPct(r.putDistanceRate);
+  elPut.classList.remove('positive', 'negative', 'warning', 'highlight', 'danger');
+  if (r.putDistanceRate <= 0) elPut.classList.add('danger');
+  else if (r.putDistanceRate < 0.05) elPut.classList.add('warning');
+
+  // 状态指示灯
+  const triggered = App.Calculator.shouldTriggerAlert(r, alertCfg);
+  App.UI.updateStatusIndicator(triggered ? 'alert' : (r.netProfitRate > 0 ? 'warning' : 'normal'));
+
+  // 触发其它面板（阶段 5+ 实现的 hook 点）
+  if (typeof App.UI.renderBreakeven === 'function') App.UI.renderBreakeven();
+  if (typeof App.UI.renderSensitivity === 'function') App.UI.renderSensitivity();
+  if (typeof App.UI.renderRevision === 'function') App.UI.renderRevision();
+  if (typeof App.Alert && typeof App.Alert.handle === 'function') App.Alert.handle(r, triggered);
+  if (typeof App.History && typeof App.History.record === 'function') App.History.record(r, triggered);
+
+  return r;
+};
+
+App.UI.updateStatusIndicator = function(state) {
+  const ind = document.getElementById('statusIndicator');
+  const lbl = document.getElementById('statusLabel');
+  ind.classList.remove('warning', 'alert');
+  if (state === 'alert') {
+    ind.classList.add('alert');
+    lbl.textContent = '套利机会';
+  } else if (state === 'warning') {
+    ind.classList.add('warning');
+    lbl.textContent = '观察中';
+  } else if (state === 'idle') {
+    lbl.textContent = '待输入';
+  } else {
+    lbl.textContent = '正常';
+  }
+};
+
+// ==================== 下修条件监控面板 ====================
+App.UI.renderRevision = function() {
+  const bond = App.Config.getCurrentBond();
+  const r = App.UI.lastCalc;
+
+  // 第一区：当前下修触发判断
+  const triggerPrice = bond.conversionPrice * bond.revisionTriggerRatio;
+  const triggerEl = document.getElementById('revisionTrigger');
+  if (r) {
+    const isBelow = r.stockPrice <= triggerPrice;
+    const dist = (r.stockPrice - triggerPrice) / r.stockPrice;
+    triggerEl.innerHTML = `
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+        <div class="metric-card">
+          <div class="metric-label">下修触发价</div>
+          <div class="metric-value">${App.UI.fmt(triggerPrice, 2)} 元</div>
+          <div class="metric-sub">转股价 × ${App.UI.fmt(bond.revisionTriggerRatio*100, 0)}%</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">当前正股价</div>
+          <div class="metric-value">${App.UI.fmt(r.stockPrice, 2)} 元</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">是否触发</div>
+          <div class="metric-value ${isBelow ? 'negative' : 'positive'}">${isBelow ? '是（已触发）' : '否'}</div>
+          <div class="metric-sub">${isBelow ? '正股已低于触发价' : '距触发还需下跌 ' + App.UI.fmtPct(dist)}</div>
+        </div>
+      </div>
+      <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+        注：实际下修条件需在 ${bond.revisionWindowDays} 个交易日内有 ${bond.revisionRequiredDays} 日低于触发价。日级累计监控暂未实现。
+      </p>
+    `;
+  } else {
+    triggerEl.innerHTML = `
+      <div class="metric-card">
+        <div class="metric-label">下修触发价</div>
+        <div class="metric-value">${App.UI.fmt(triggerPrice, 2)} 元</div>
+        <div class="metric-sub">转股价 × ${App.UI.fmt(bond.revisionTriggerRatio*100, 0)}% — 请输入正股价以判断是否触发</div>
+      </div>
+    `;
+  }
+
+  // 第二区：理论下修底参考
+  const floor = App.Calculator.calculateRevisionFloor(bond);
+  const floorEl = document.getElementById('revisionFloor');
+  let tagClass = 'green';
+  let tagText = '下修空间充足';
+  if (floor.spacePercent < 0.10) {
+    tagClass = 'red';
+    tagText = '下修空间几近耗尽，警惕长期持有风险';
+  } else if (floor.spacePercent < 0.30) {
+    tagClass = 'yellow';
+    tagText = '下修空间有限';
+  }
+
+  floorEl.innerHTML = `
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+      <div class="metric-card">
+        <div class="metric-label">理论下修底</div>
+        <div class="metric-value">${App.UI.fmt(floor.theoreticalFloor, 2)} 元</div>
+        <div class="metric-sub">
+          ${bond.hasNetAssetFloor
+            ? 'max(每股净资产 ' + App.UI.fmt(bond.netAssetPerShare, 2) + ', 面值 ' + App.UI.fmt(bond.stockFaceValue, 2) + ')'
+            : '股票面值 ' + App.UI.fmt(bond.stockFaceValue, 2)}
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">当前转股价</div>
+        <div class="metric-value">${App.UI.fmt(bond.conversionPrice, 2)} 元</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">距下修底空间</div>
+        <div class="metric-value">${App.UI.fmtPct(floor.spacePercent)}</div>
+        <div class="metric-sub">${App.UI.fmt(floor.spaceFromCurrent, 2)} 元</div>
+      </div>
+      <div class="metric-card" style="display: flex; flex-direction: column; justify-content: center;">
+        <div class="metric-label">空间评级</div>
+        <div style="margin-top: 6px;"><span class="status-tag ${tagClass}">${tagText}</span></div>
+      </div>
+    </div>
+    <p class="disclaimer">
+      ⚠️ 此为简化估算，仅基于每股净资产和股票面值。实际下修价格还受"前 20 个交易日均价"和"前 1 日均价"等动态约束，最终以股东大会公告为准。本指标仅供长期持有风险参考，不可作为交易决策依据。
+    </p>
+  `;
+
+  // 第三区：下修历史
+  const histEl = document.getElementById('revisionHistory');
+  const history = (bond.revisionHistory || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+  if (history.length === 0) {
+    histEl.innerHTML = '<p style="color: var(--text-muted);">暂无下修记录</p>';
+  } else {
+    let html = `<table class="data-table">
+      <thead>
+        <tr><th>日期</th><th>原转股价</th><th>新转股价</th><th>下修幅度</th><th>备注</th><th>操作</th></tr>
+      </thead><tbody>`;
+    history.forEach((rec, idx) => {
+      const drop = rec.oldPrice > 0 ? (rec.newPrice - rec.oldPrice) / rec.oldPrice : 0;
+      html += `<tr>
+        <td>${rec.date || '--'}</td>
+        <td>${App.UI.fmt(rec.oldPrice, 2)}</td>
+        <td>${App.UI.fmt(rec.newPrice, 2)}</td>
+        <td class="${drop < 0 ? 'cell-loss' : (drop > 0 ? 'cell-gain' : '')}">${App.UI.fmtPct(drop)}</td>
+        <td style="font-family: var(--font-sans); text-align: left;">${(rec.note || '').replace(/</g, '&lt;')}</td>
+        <td><button class="btn btn-danger" data-idx="${idx}" data-action="delete-revision" style="padding: 2px 8px; font-size: 11px;">删除</button></td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    histEl.innerHTML = html;
+    histEl.querySelectorAll('[data-action="delete-revision"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx, 10);
+        if (!confirm('确认删除该条下修记录？\n注意：删除记录不会自动还原转股价。')) return;
+        const cur = App.Config.getCurrentBond();
+        cur.revisionHistory.splice(idx, 1);
+        App.Config.updateBond(cur.bondCode, { revisionHistory: cur.revisionHistory });
+        App.UI.renderRevision();
+      });
+    });
+  }
+};
+
+// 记录新下修：打开模态框时初始化
+document.getElementById('btnAddRevision').addEventListener('click', () => {
+  const bond = App.Config.getCurrentBond();
+  document.getElementById('revisionDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('revisionNewPrice').value = '';
+  document.getElementById('revisionNote').value = '';
+  document.getElementById('revisionOldPriceHint').textContent = `当前转股价：${App.UI.fmt(bond.conversionPrice, 2)} 元（提交后将自动更新为新值，旧值进入历史）`;
+});
+
+document.getElementById('btnConfirmRevision').addEventListener('click', () => {
+  const bond = App.Config.getCurrentBond();
+  const date = document.getElementById('revisionDate').value;
+  const newPrice = parseFloat(document.getElementById('revisionNewPrice').value);
+  const note = document.getElementById('revisionNote').value.trim();
+  if (!date) { alert('请填写日期'); return; }
+  if (!isFinite(newPrice) || newPrice <= 0) { alert('请填写有效的新转股价'); return; }
+
+  // 校验：理论下修底
+  const floor = App.Calculator.calculateRevisionFloor(bond);
+  if (newPrice < floor.theoreticalFloor) {
+    if (!confirm(`新转股价 ${newPrice} 低于理论下修底 ${floor.theoreticalFloor.toFixed(2)}，确认继续？`)) return;
+  }
+  if (newPrice >= bond.conversionPrice) {
+    if (!confirm(`新转股价 ${newPrice} 不低于当前转股价 ${bond.conversionPrice}，通常下修是降价。确认继续？`)) return;
+  }
+
+  App.Config.addRevisionRecord(bond.bondCode, {
+    date, oldPrice: bond.conversionPrice, newPrice, note
+  });
+  document.getElementById('revisionModal').classList.remove('open');
+  App.UI.renderMonitor();  // 转股价已变，全部重算
+  App.UI.renderRevision();
+});
+
+// ==================== 盈亏平衡分析 ====================
+App.UI.renderBreakeven = function() {
+  const wrap = document.getElementById('breakevenTable');
+  const r = App.UI.lastCalc;
+  if (!r) {
+    wrap.innerHTML = '<p style="color: var(--text-muted);">请先输入价格数据</p>';
+    return;
+  }
+  const bond = App.Config.getCurrentBond();
+  const cost = App.Config.getCost();
+  const targets = [0, 0.01, 0.02, 0.03];
+
+  let html = `<table class="data-table">
+    <thead>
+      <tr>
+        <th>目标净收益率</th>
+        <th>转债 ${App.UI.fmt(r.bondPrice)} 元下，正股需 ≥</th>
+        <th>距当前正股价</th>
+        <th>正股 ${App.UI.fmt(r.stockPrice)} 元下，转债需 ≤</th>
+        <th>距当前转债价</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  targets.forEach(t => {
+    const sNeed = App.Calculator.findStockPriceThreshold(bond, r.bondPrice, t, cost);
+    const bNeed = App.Calculator.findBondPriceThreshold(bond, r.stockPrice, t, cost);
+    const sGap = (sNeed - r.stockPrice) / r.stockPrice;  // 正=还需上涨
+    const bGap = (r.bondPrice - bNeed) / r.bondPrice;    // 正=还需下跌
+    const sGapText = (sGap >= 0 ? '需上涨 ' : '已超出 ') + App.UI.fmtPct(Math.abs(sGap));
+    const bGapText = (bGap >= 0 ? '需下跌 ' : '已超出 ') + App.UI.fmtPct(Math.abs(bGap));
+    const sGapClass = sGap <= 0 ? 'cell-gain' : (sGap < 0.02 ? 'cell-yellow' : 'cell-gray');
+    const bGapClass = bGap <= 0 ? 'cell-gain' : (bGap < 0.02 ? 'cell-yellow' : 'cell-gray');
+    html += `<tr>
+      <td><strong>${(t*100).toFixed(0)}%</strong>${t === 0 ? '（保本）' : ''}</td>
+      <td>${App.UI.fmt(sNeed, 3)} 元</td>
+      <td class="${sGapClass}">${sGapText}</td>
+      <td>${App.UI.fmt(bNeed, 3)} 元</td>
+      <td class="${bGapClass}">${bGapText}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  html += '<p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">绿色=已达成，黄色=接近（差距 &lt;2%），灰色=较远</p>';
+  wrap.innerHTML = html;
+};
+
+// ==================== 敏感性矩阵（5×5） ====================
+App.UI.renderSensitivity = function() {
+  const wrap = document.getElementById('sensitivityMatrix');
+  const r = App.UI.lastCalc;
+  if (!r) {
+    wrap.innerHTML = '<p style="color: var(--text-muted);">请先输入价格数据</p>';
+    return;
+  }
+  const bond = App.Config.getCurrentBond();
+  const cost = App.Config.getCost();
+  const alertCfg = App.Config.getAlert();
+  const threshold = alertCfg.netProfitRateThreshold;
+  const deltas = [-0.02, -0.01, 0, 0.01, 0.02];
+
+  // 行：转债价格变动；列：正股价格变动
+  let html = `<table class="data-table">
+    <thead>
+      <tr>
+        <th rowspan="2" style="vertical-align: middle;">转债价格变动 ↓</th>
+        <th colspan="5">正股价格变动 →</th>
+      </tr>
+      <tr>`;
+  deltas.forEach(d => {
+    html += `<th>${d > 0 ? '+' : ''}${(d*100).toFixed(0)}%</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  deltas.forEach(db => {
+    const newBondPrice = r.bondPrice * (1 + db);
+    html += `<tr><th>${db > 0 ? '+' : ''}${(db*100).toFixed(0)}%</th>`;
+    deltas.forEach(ds => {
+      const newStockPrice = r.stockPrice * (1 + ds);
+      const sub = App.Calculator.calculateArbitrage(bond, { bondPrice: newBondPrice, stockPrice: newStockPrice }, cost);
+      const rate = sub.netProfitRate;
+      // A股惯例：盈利红、亏损绿
+      let cls = 'cell-gray';
+      if (rate >= threshold) {
+        cls = 'cell-gain';      // ≥阈值 → 红（套利达成）
+      } else if (rate >= 0) {
+        cls = 'cell-yellow';    // 0~阈值 → 黄
+      } else {
+        cls = 'cell-loss';      // 亏损 → 绿
+      }
+      html += `<td class="${cls}">${App.UI.fmtPct(rate)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  html += `<p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+    绿色=净收益率 ≥ ${App.UI.fmtPct(threshold)} 阈值，浅黄=0% ~ 阈值，红色=亏损，灰色=无数据
+    <br>中心格（0%/0%）= 当前价格组合的净收益率
+  </p>`;
+  wrap.innerHTML = html;
+};
+
+// 输入事件绑定
+document.getElementById('btnUpdate').addEventListener('click', App.UI.renderMonitor);
+
+['inputBondPrice', 'inputStockPrice'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', App.UI.renderMonitor);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      App.UI.renderMonitor();
+    }
+  });
+});
+
+// 转债切换
+document.getElementById('bondSelector').addEventListener('change', (e) => {
+  App.Config.setCurrentBond(e.target.value);
+  App.UI.renderMonitor();
+});
+
+// ==================== 配置抽屉渲染 ====================
+App.UI.openConfigDrawer = function(type) {
+  const drawer = document.getElementById('configDrawer');
+  const overlay = document.getElementById('configDrawerOverlay');
+  let html = '';
+  if (type === 'bond') html = App.UI.renderBondConfigForm();
+  else if (type === 'cost') html = App.UI.renderCostConfigForm();
+  else if (type === 'alert') html = App.UI.renderAlertConfigForm();
+  drawer.innerHTML = html;
+  overlay.classList.add('open');
+  App.UI._wireDrawer(type);
+};
+
+App.UI.closeConfigDrawer = function() {
+  document.getElementById('configDrawerOverlay').classList.remove('open');
+};
+
+App.UI.renderBondConfigForm = function() {
+  const bond = App.Config.getCurrentBond();
+  return `
+    <h2>转债配置</h2>
+    <div class="config-section">
+      <h3>当前选中：${bond.bondName}（${bond.bondCode}）</h3>
+      <div class="form-group">
+        <label>当前转股价（元）</label>
+        <input type="number" step="0.01" id="cfgConvPrice" value="${bond.conversionPrice}">
+        <div class="hint">下修后请同步更新此值</div>
+      </div>
+      <div class="form-group">
+        <label>强赎触发系数</label>
+        <input type="number" step="0.01" id="cfgCall" value="${bond.callTriggerRatio}">
+        <div class="hint">通常 1.30（130%）</div>
+      </div>
+      <div class="form-group">
+        <label>回售触发系数</label>
+        <input type="number" step="0.01" id="cfgPut" value="${bond.putTriggerRatio}">
+        <div class="hint">通常 0.70（70%）</div>
+      </div>
+      <div class="form-group">
+        <label>下修触发系数</label>
+        <input type="number" step="0.01" id="cfgRev" value="${bond.revisionTriggerRatio}">
+        <div class="hint">通常 0.80（80%）或 0.85，每只券不同</div>
+      </div>
+      <div class="form-group">
+        <label>每股净资产（元）</label>
+        <input type="number" step="0.01" id="cfgNetAsset" value="${bond.netAssetPerShare}">
+        <div class="hint">建议每季度财报后更新</div>
+      </div>
+      <div class="form-group">
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="cfgHasFloor" ${bond.hasNetAssetFloor ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+          <span>下修不低于每股净资产</span>
+        </div>
+        <div class="hint">需查募集说明书确认</div>
+      </div>
+      <div class="form-group">
+        <label>股票面值（元）</label>
+        <input type="number" step="0.01" id="cfgFaceValue" value="${bond.stockFaceValue}">
+        <div class="hint">A股几乎都是 1 元</div>
+      </div>
+      <div class="form-group">
+        <label>备注</label>
+        <input type="text" id="cfgNotes" value="${(bond.notes || '').replace(/"/g, '&quot;')}">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="btnDeleteBond">删除此转债</button>
+      <button class="btn btn-secondary" id="btnCloseDrawer">取消</button>
+      <button class="btn btn-primary" id="btnSaveBond">保存</button>
+    </div>
+    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+      <button class="btn btn-secondary" id="btnOpenAddBond" style="width: 100%;">+ 新增转债</button>
+    </div>
+  `;
+};
+
+App.UI.renderCostConfigForm = function() {
+  const c = App.Config.getCost();
+  return `
+    <h2>成本配置</h2>
+    <div class="config-section">
+      <div class="form-group">
+        <label>转债买入佣金率</label>
+        <input type="number" step="0.00001" id="cfgBondComm" value="${c.bondCommissionRate}">
+        <div class="hint">默认 0.0001（万一）</div>
+      </div>
+      <div class="form-group">
+        <label>股票卖出佣金率</label>
+        <input type="number" step="0.00001" id="cfgStockComm" value="${c.stockCommissionRate}">
+        <div class="hint">默认 0.00025（万二点五）</div>
+      </div>
+      <div class="form-group">
+        <label>股票最低佣金（元）</label>
+        <input type="number" step="0.01" id="cfgMinComm" value="${c.stockMinCommission}">
+      </div>
+      <div class="form-group">
+        <label>印花税率</label>
+        <input type="number" step="0.00001" id="cfgStamp" value="${c.stampDutyRate}">
+        <div class="hint">⚠️ 政策可能变化，请确认当前最新税率</div>
+      </div>
+      <div class="form-group">
+        <label>滑点缓冲</label>
+        <input type="number" step="0.0001" id="cfgSlippage" value="${c.slippageBuffer}">
+        <div class="hint">默认 0.002（覆盖 T+1 隔夜波动的保守估计）</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btnCloseDrawer">取消</button>
+      <button class="btn btn-primary" id="btnSaveCost">保存</button>
+    </div>
+  `;
+};
+
+App.UI.renderAlertConfigForm = function() {
+  const a = App.Config.getAlert();
+  return `
+    <h2>预警配置</h2>
+    <div class="config-section">
+      <div class="form-group">
+        <label>净收益率阈值</label>
+        <input type="number" step="0.001" id="cfgRateTh" value="${a.netProfitRateThreshold}">
+        <div class="hint">默认 0.01（1%）</div>
+      </div>
+      <div class="form-group">
+        <label>单张净收益阈值（元）</label>
+        <input type="number" step="0.1" id="cfgProfitTh" value="${a.netProfitPerBondThreshold}">
+        <div class="hint">默认 1 元</div>
+      </div>
+      <div class="form-group">
+        <label>冷却时间（秒）</label>
+        <input type="number" step="1" id="cfgCooldown" value="${a.alertCooldownSeconds}">
+      </div>
+      <div class="form-group">
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="cfgSound" ${a.enableSound ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+          <span>启用提示音</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="cfgNotify" ${a.enableBrowserNotification ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+          <span>启用浏览器通知</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btnCloseDrawer">取消</button>
+      <button class="btn btn-primary" id="btnSaveAlert">保存</button>
+    </div>
+  `;
+};
+
+App.UI._wireDrawer = function(type) {
+  const close = document.getElementById('btnCloseDrawer');
+  if (close) close.addEventListener('click', App.UI.closeConfigDrawer);
+
+  if (type === 'bond') {
+    document.getElementById('btnSaveBond').addEventListener('click', () => {
+      const code = App.Config.currentBondCode;
+      App.Config.updateBond(code, {
+        conversionPrice: parseFloat(document.getElementById('cfgConvPrice').value),
+        callTriggerRatio: parseFloat(document.getElementById('cfgCall').value),
+        putTriggerRatio: parseFloat(document.getElementById('cfgPut').value),
+        revisionTriggerRatio: parseFloat(document.getElementById('cfgRev').value),
+        netAssetPerShare: parseFloat(document.getElementById('cfgNetAsset').value),
+        hasNetAssetFloor: document.getElementById('cfgHasFloor').checked,
+        stockFaceValue: parseFloat(document.getElementById('cfgFaceValue').value),
+        notes: document.getElementById('cfgNotes').value
+      });
+      App.UI.closeConfigDrawer();
+      App.UI.renderMonitor();
+    });
+    document.getElementById('btnDeleteBond').addEventListener('click', () => {
+      if (!confirm('确定删除当前转债？')) return;
+      try {
+        App.Config.removeBond(App.Config.currentBondCode);
+        App.UI.renderBondSelector();
+        App.UI.closeConfigDrawer();
+        App.UI.renderMonitor();
+      } catch (e) {
+        alert(e.message);
+      }
+    });
+    document.getElementById('btnOpenAddBond').addEventListener('click', () => {
+      App.UI.closeConfigDrawer();
+      document.getElementById('addBondModal').classList.add('open');
+    });
+  } else if (type === 'cost') {
+    document.getElementById('btnSaveCost').addEventListener('click', () => {
+      App.Config.updateCost({
+        bondCommissionRate: parseFloat(document.getElementById('cfgBondComm').value),
+        stockCommissionRate: parseFloat(document.getElementById('cfgStockComm').value),
+        stockMinCommission: parseFloat(document.getElementById('cfgMinComm').value),
+        stampDutyRate: parseFloat(document.getElementById('cfgStamp').value),
+        slippageBuffer: parseFloat(document.getElementById('cfgSlippage').value)
+      });
+      App.UI.closeConfigDrawer();
+      App.UI.renderMonitor();
+    });
+  } else if (type === 'alert') {
+    document.getElementById('btnSaveAlert').addEventListener('click', () => {
+      App.Config.updateAlert({
+        netProfitRateThreshold: parseFloat(document.getElementById('cfgRateTh').value),
+        netProfitPerBondThreshold: parseFloat(document.getElementById('cfgProfitTh').value),
+        alertCooldownSeconds: parseInt(document.getElementById('cfgCooldown').value, 10),
+        enableSound: document.getElementById('cfgSound').checked,
+        enableBrowserNotification: document.getElementById('cfgNotify').checked
+      });
+      App.UI.closeConfigDrawer();
+      App.UI.renderMonitor();
+    });
+  }
+};
+
+// 新增转债模态框确认
+document.getElementById('btnConfirmAddBond').addEventListener('click', () => {
+  try {
+    App.Config.addBond({
+      bondCode: document.getElementById('newBondCode').value.trim(),
+      bondName: document.getElementById('newBondName').value.trim(),
+      stockCode: document.getElementById('newStockCode').value.trim(),
+      stockName: document.getElementById('newStockName').value.trim(),
+      conversionPrice: parseFloat(document.getElementById('newConvPrice').value),
+      netAssetPerShare: parseFloat(document.getElementById('newNetAsset').value) || 0,
+      hasNetAssetFloor: document.getElementById('newHasFloor').checked
+    });
+    App.Config.setCurrentBond(document.getElementById('newBondCode').value.trim());
+    App.UI.renderBondSelector();
+    document.getElementById('addBondModal').classList.remove('open');
+    // 清空表单
+    ['newBondCode','newBondName','newStockCode','newStockName','newConvPrice','newNetAsset'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    App.UI.renderMonitor();
+  } catch (e) {
+    alert(e.message);
+  }
+});
+
+// 时钟
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  document.getElementById('currentTime').textContent = h + ':' + m + ':' + s;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// 面板折叠
+document.querySelectorAll('.panel-header').forEach(header => {
+  header.addEventListener('click', () => {
+    header.parentElement.classList.toggle('collapsed');
+  });
+});
+
+// 侧边栏导航（滚动到对应面板）
+const panelMap = {
+  monitor: 'panelMonitor',
+  breakeven: 'panelBreakeven',
+  sensitivity: 'panelSensitivity',
+  revision: 'panelRevision',
+  history: 'panelHistory'
+};
+
+document.querySelectorAll('.nav-item[data-panel]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const panelId = panelMap[btn.dataset.panel];
+    if (panelId) {
+      const el = document.getElementById(panelId);
+      if (el) {
+        el.classList.remove('collapsed');
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  });
+});
+
+// 配置抽屉开关
+document.getElementById('configDrawerOverlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('configDrawerOverlay')) App.UI.closeConfigDrawer();
+});
+
+document.getElementById('btnBondConfig').addEventListener('click', () => App.UI.openConfigDrawer('bond'));
+document.getElementById('btnCostConfig').addEventListener('click', () => App.UI.openConfigDrawer('cost'));
+document.getElementById('btnAlertConfig').addEventListener('click', () => App.UI.openConfigDrawer('alert'));
+
+// 初始化下拉列表
+App.UI.renderBondSelector();
+App.UI.updateStatusIndicator('idle');
+// 即便没有价格输入，下修面板也先渲染一次（理论下修底与历史不依赖价格）
+App.UI.renderRevision();
+App.UI.renderHistory();
+
+// 模态框开关
+document.getElementById('btnAddRevision').addEventListener('click', () => {
+  document.getElementById('revisionModal').classList.add('open');
+});
+document.getElementById('btnCancelRevision').addEventListener('click', () => {
+  document.getElementById('revisionModal').classList.remove('open');
+});
+
+document.getElementById('btnCancelAddBond').addEventListener('click', () => {
+  document.getElementById('addBondModal').classList.remove('open');
+});
+
+console.log('可转债套利监控编辑器 v3.0 已加载');
+</script>
+</body>
+</html>
